@@ -2,8 +2,12 @@ package com.example.greyscaleappjava;
 
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
@@ -19,7 +23,7 @@ import java.io.IOException;
 
 public class MainActivity extends AppCompatActivity {
 
-    private Button chooseImageButton, greyScaleButton;
+    private Button chooseImageGalleryButton, chooseImageCameraButton, greyScaleButton;
     private ImageView imageView;
     Uri imageUri;
 
@@ -32,14 +36,26 @@ public class MainActivity extends AppCompatActivity {
 
         getSupportActionBar().hide();
 
-        chooseImageButton = (Button) findViewById(R.id.chooseImageButton);
+        chooseImageGalleryButton = (Button) findViewById(R.id.chooseImageGalleryButton);
+        chooseImageCameraButton = (Button) findViewById(R.id.chooseImageCameraButton);
         greyScaleButton = (Button) findViewById(R.id.greyScaleButton);
         imageView = (ImageView) findViewById(R.id.imageView);
 
-        chooseImageButton.setOnClickListener(new View.OnClickListener() {
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(MainActivity.this, new String[] {Manifest.permission.CAMERA}, 100);
+        }
+
+        chooseImageGalleryButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 GalleryButton();
+            }
+        });
+
+        chooseImageCameraButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                CameraButton();
             }
         });
 
@@ -63,6 +79,12 @@ public class MainActivity extends AppCompatActivity {
         startActivityForResult(Intent.createChooser(gallery, "Select a picture"), PICK_IMAGE);
     }
 
+    private void CameraButton(){
+        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+
+        startActivityForResult(camera, 100);
+    }
+
     private void ConvertImageButton(){
         imageView.setImageBitmap(ConvertGreyScale(((BitmapDrawable) imageView.getDrawable()).getBitmap()));
     }
@@ -79,6 +101,9 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+        } else if (requestCode == 100 && resultCode == RESULT_OK) {
+                Bitmap bitmap = (Bitmap) data.getExtras().get("data");
+                imageView.setImageBitmap(bitmap);
         }
     }
 
