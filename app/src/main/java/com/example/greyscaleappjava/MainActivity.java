@@ -6,6 +6,7 @@ import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.Manifest;
+import android.content.ContentValues;
 import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.graphics.Bitmap;
@@ -13,19 +14,28 @@ import android.graphics.Color;
 import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Environment;
 import android.provider.MediaStore;
 import android.view.View;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 public class MainActivity extends AppCompatActivity {
 
+    private static final int ACCESS_CAMERA = 1000, SAVE_PHOTO = 1100;
+
     private Button chooseImageGalleryButton, chooseImageCameraButton, greyScaleButton;
     private ImageView imageView;
-    Uri imageUri;
+
+    Uri galleryImageUri, cameraImageUri;
+    OutputStream outputStream;
 
     private static final int PICK_IMAGE = 1;
 
@@ -42,7 +52,11 @@ public class MainActivity extends AppCompatActivity {
         imageView = (ImageView) findViewById(R.id.imageView);
 
         if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(MainActivity.this, new String[] {Manifest.permission.CAMERA}, 100);
+            ActivityCompat.requestPermissions(MainActivity.this, new String[] {Manifest.permission.CAMERA}, ACCESS_CAMERA);
+        }
+
+        if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.WRITE_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(MainActivity.this, new String[] {Manifest.permission.WRITE_EXTERNAL_STORAGE}, SAVE_PHOTO);
         }
 
         chooseImageGalleryButton.setOnClickListener(new View.OnClickListener() {
@@ -80,13 +94,19 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void CameraButton(){
-        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.Images.Media.TITLE, "New Picture");
+        values.put(MediaStore.Images.Media.DESCRIPTION, "From the greyscale APP");
+        cameraImageUri = getContentResolver().insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values);
 
-        startActivityForResult(camera, 100);
+        Intent camera = new Intent(MediaStore.ACTION_IMAGE_CAPTURE);
+        camera.putExtra(MediaStore.EXTRA_OUTPUT, cameraImageUri);
+        startActivityForResult(camera, ACCESS_CAMERA);
     }
 
     private void ConvertImageButton(){
         imageView.setImageBitmap(ConvertGreyScale(((BitmapDrawable) imageView.getDrawable()).getBitmap()));
+        SaveImage();
     }
 
     @Override
@@ -94,16 +114,15 @@ public class MainActivity extends AppCompatActivity {
         super.onActivityResult(requestCode, resultCode, data);
 
         if (requestCode == PICK_IMAGE && resultCode == RESULT_OK) {
-            imageUri = data.getData();
+            galleryImageUri = data.getData();
             try {
-                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), imageUri);
+                Bitmap bitmap = MediaStore.Images.Media.getBitmap(getContentResolver(), galleryImageUri);
                 imageView.setImageBitmap(bitmap);
             } catch (IOException e) {
                 e.printStackTrace();
             }
-        } else if (requestCode == 100 && resultCode == RESULT_OK) {
-                Bitmap bitmap = (Bitmap) data.getExtras().get("data");
-                imageView.setImageBitmap(bitmap);
+        } else if (requestCode == ACCESS_CAMERA && resultCode == RESULT_OK) {
+            imageView.setImageURI(cameraImageUri);
         }
     }
 
@@ -129,5 +148,35 @@ public class MainActivity extends AppCompatActivity {
         }
 
         return greyImage;
+    }
+
+    private void SaveImage(){
+        Bitmap bitmap = ((BitmapDrawable) imageView.getDrawable()).getBitmap();
+
+        File filepath = Environment.getExternalStorageDirectory();
+        File directory = new File(filepath.getAbsolutePath()+"/GreyScale/");
+        directory.mkdir();
+        File greyScaleFile = new File(directory, System.currentTimeMillis()+".jpg");
+
+        try {
+            outputStream = new FileOutputStream(greyScaleFile);
+        } catch (FileNotFoundException e) {
+            e.printStackTrace();
+        }
+
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 100, outputStream);
+
+        Toast.makeText(MainActivity.this, "Grey scaled image saved", Toast.LENGTH_SHORT).show();
+
+        try {
+            outputStream.flush();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        try {
+            outputStream.close();
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
     }
 }
